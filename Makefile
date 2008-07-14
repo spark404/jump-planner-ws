@@ -1,7 +1,8 @@
-# $Id: Makefile,v 1.5 2008/07/14 10:04:43 spark Exp $
+# $Id: Makefile,v 1.6 2008/07/14 10:09:15 cvsd Exp $
 #
 # Makefile
- 
+#
+
 SOAP_LIB=/usr/lib/libgsoap.a
 
 CPPFLAGS=
