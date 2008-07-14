@@ -1,6 +1,7 @@
-# $Id: Makefile,v 1.3 2008/07/13 21:35:41 spark Exp $
+# $Id: Makefile,v 1.4 2008/07/14 09:56:05 spark Exp $
 #
 # Makefile
+# 
  
 SOAP_LIB=/usr/lib/libgsoap.a
 
