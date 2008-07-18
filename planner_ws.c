@@ -1,4 +1,4 @@
-/* $Id: planner_ws.c,v 1.1 2008/07/13 21:13:41 spark Exp $
+/* $Id: planner_ws.c,v 1.2 2008/07/18 07:16:01 cvsd Exp $
  * 
  * soap server
  */
@@ -7,6 +7,7 @@
 #include "planner.nsmap"
 #include <pthread.h>
 
+#include "prioqueue.h"
 #include "calculator.h"
 
 #define BACKLOG 100
@@ -31,7 +32,7 @@ struct soap *soap_thr[MAX_THR];
 
 void soapserver_start (int port) {
 
-  SOAP_SOCKET master_sock, sock;
+  SOAP_SOCKET master_sock;
   int i;
 
   soap_init(&soap);
@@ -77,6 +78,7 @@ void *soapserver_monitor (void *data) {
     while (enqueue(s) == SOAP_EOM)
       sleep (1); // queue is full, wait for a bit
   }
+  return NULL;
 }
 
 void soapserver_stop () {
@@ -169,7 +171,7 @@ int ns__planner(struct soap *soap, long from, long to, double dist, struct JumpR
     fprintf(stderr, "item %d : %ld %f\n", i, jumps[i].system, jumps[i].distance);
   }
 
-  routeelement_t *waypoints;
+  jumproute_t *waypoints;
   waypoints = calculator(from, to, dist);
 
   if (waypoints == NULL) {

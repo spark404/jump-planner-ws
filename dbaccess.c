@@ -1,4 +1,4 @@
-/* $Id: dbaccess.c,v 1.1 2008/07/13 21:13:41 spark Exp $
+/* $Id: dbaccess.c,v 1.2 2008/07/18 07:16:00 cvsd Exp $
  *
  * Database access routines for the planner
  */
@@ -10,6 +10,8 @@
 #include <inttypes.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <math.h>
+#include <errno.h>
 
 #include "libpq-fe.h"
 #include "dbaccess.h"
@@ -58,6 +60,8 @@ void dbaccess_finish(dbcontext_t *dbcontext) {
 
   /* should we remove the prepared statements? */
   PQfinish(conn);
+
+  free (dbcontext);
 }
 
 int dbaccess_preparestatements(dbcontext_t *dbcontext) {
@@ -146,12 +150,13 @@ jumppoints_t *dbaccess_findnextjump(dbcontext_t *dbcontext, long from, long to, 
   paramLengths[3] = strlen(paramValues[0]);
   paramFormats[3] = 0; /* text representation */
   
-  /* DEBUG */
+#if defined (DEBUG)
   int i;
   fprintf(stderr, "Preparing to execute  query 'findNeighbours':\n");
   for (i=0; i< 4; i++) {
     fprintf(stderr, " Param %d : '%s' (len=%d)\n", i, paramValues[i], paramLengths[i]);
   }
+#endif
 
   conn = dbcontext->connection;
   
@@ -169,7 +174,9 @@ jumppoints_t *dbaccess_findnextjump(dbcontext_t *dbcontext, long from, long to, 
     return NULL;
   }
 
+#if defined(DEBUG)
   fprintf (stderr, "Query succeeded with %d rows in the result\n", PQntuples(result));
+#endif
 
   int row;
   for (row=0; row < PQntuples(result); row++ ) {
@@ -191,13 +198,94 @@ jumppoints_t *dbaccess_findnextjump(dbcontext_t *dbcontext, long from, long to, 
       current = current->next;
     }
 
+#if defined(DEBUG)
     /* DEBUG */
     fprintf (stderr, " %3d> %s | %s | %s\n", row, 
                                              PQgetvalue(result, row, 0),
                                              PQgetvalue(result, row, 1),
                                              PQgetvalue(result, row, 2));
+#endif  
+
   }
-  
+
   PQclear(result);
+  free(paramValues[0]);
+  free(paramValues[1]);
+  //free(paramValues[2]);
+  free(paramValues[3]);
   return jumpoptions;
+}
+
+/**
+ *  dbcontext   : the current db context with connection id
+ *  from        : the current solarsystemid
+ *  to          : the final destination
+ *
+ *  returns a float with the distance between the two nodes
+ */
+float dbaccess_finddistance(dbcontext_t *dbcontext, long from, long to) {
+  PGconn     *conn;
+  PGresult   *result;
+  char       *paramValues[2];
+  int        paramLengths[2];
+  int        paramFormats[2];
+
+  /* 0: from solarsystem */
+  paramValues[0] = (char *)malloc(17);
+  snprintf (paramValues[0], 17, "%16ld", from);
+  paramLengths[0] = strlen(paramValues[0]);
+  paramFormats[0] = 0; /* text representation */
+
+  /* 1: to solarsystem */
+  paramValues[1] = (char *)malloc(17);
+  snprintf (paramValues[1], 17, "%16ld", to);
+  paramLengths[1] = strlen(paramValues[1]);
+  paramFormats[1] = 0; /* text representation */
+  
+#if defined(DEBUG)
+  int i;
+  fprintf(stderr, "Preparing to execute  query 'findDistance':\n");
+  for (i=0; i< 2; i++) {
+    fprintf(stderr, " Param %d : '%s' (len=%d)\n", i, paramValues[i], paramLengths[i]);
+  }
+#endif
+
+  conn = dbcontext->connection;
+  
+  result = PQexecPrepared(conn,
+	               "findDistance",
+		       2,
+		       (const char *const*)paramValues,
+		       paramLengths,
+		       paramFormats,
+		       0); /* returnFormat = 0, return in text format */
+
+  if (PQresultStatus(result) != PGRES_TUPLES_OK) {
+    fprintf(stderr, "Failed to execute prepared query 'findDistance': (%d) %s", PQresultStatus(result), PQerrorMessage(conn));
+    PQclear(result);
+    return -1;
+  }
+
+#if defined(DEBUG)
+  fprintf (stderr, "Query succeeded with %d rows in the result\n", PQntuples(result));
+  int j;
+  for (j=0 ; j< PQntuples(result); j++) {
+    fprintf (stderr, " %3d> %s \n", j, 
+	     PQgetvalue(result, j, 0));
+  }
+#endif
+
+  if (PQntuples(result) != 1) {
+    fprintf(stderr, "Strange result from database for distance between %ld and %ld\n", from, to);
+    return -1;
+  }
+
+  float dist = (float)strtod(PQgetvalue(result, 0, 0), NULL);
+#if defined(DEBUG)
+  fprintf(stderr, "string %s converted to %f\n", PQgetvalue(result, 0, 0), dist);
+#endif
+  PQclear(result);
+  free(paramValues[0]);
+  free(paramValues[1]);
+  return dist;
 }
