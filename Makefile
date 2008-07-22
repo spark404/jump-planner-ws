@@ -1,12 +1,12 @@
-# $Id: Makefile,v 1.8 2008/07/18 07:16:00 cvsd Exp $
+# $Id: Makefile,v 1.9 2008/07/22 11:34:47 cvsd Exp $
 #
 # Makefile
 
 
 SOAP_LIB=/usr/lib/libgsoap.a
 
-#CPPFLAGS=-O3 -march=i686 -fomit-frame-pointer -pipe
-CPPFLAGS=
+CPPFLAGS=-O3 -march=i686 -fomit-frame-pointer -pipe
+#CPPFLAGS=
 #CPPFLAGS=-pg
 #CPPFLAGS= -g -DDEBUG -Wall
 LDFLAGS=-lpthread -lpq

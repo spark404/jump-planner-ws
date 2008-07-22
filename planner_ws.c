@@ -1,4 +1,4 @@
-/* $Id: planner_ws.c,v 1.2 2008/07/18 07:16:01 cvsd Exp $
+/* $Id: planner_ws.c,v 1.3 2008/07/22 11:34:47 cvsd Exp $
  * 
  * soap server
  */
@@ -6,6 +6,7 @@
 #include "soapH.h"
 #include "planner.nsmap"
 #include <pthread.h>
+#include <syslog.h>
 
 #include "prioqueue.h"
 #include "calculator.h"
@@ -39,10 +40,12 @@ void soapserver_start (int port) {
 
   master_sock = soap_bind(&soap, NULL, port, BACKLOG);
   if(!soap_valid_socket(master_sock)) {
-    fprintf (stderr, "Socket create failed, die die die\n");
+    syslog (LOG_CRIT, "Socket create failed, die die die\n");
     exit(1);
   }
-  fprintf (stderr, "Socket created on port %d\n", port);
+#if defined(DEBUG)
+  syslog (LOG_DEBUG, "Socket created on port %d\n", port);
+#endif
 
   pthread_mutex_init(&queue_cs, NULL);
   pthread_cond_init(&queue_cv, NULL);
@@ -52,7 +55,9 @@ void soapserver_start (int port) {
     pthread_create(&tid[i], NULL, 
 		   (void*)process_queue, 
 		   soap_thr[i]);
-    fprintf (stderr, "Thread %d created\n", i);
+#if defined (DEBUG)
+    syslog (LOG_DEBUG, "Thread %d created\n", i);
+#endif
 
   }
   pthread_create(&monitorid, NULL,
@@ -63,7 +68,9 @@ void soapserver_start (int port) {
 void *soapserver_monitor (void *data) {
   int s;
   for (;;) {
-    fprintf (stderr, "waiting for accept\n");
+#if defined (DEBUG)
+    syslog (LOG_DEBUG, "waiting for accept\n");
+#endif
     s = soap_accept(&soap);
     if (!soap_valid_socket(s)) {
       if (soap.errnum) {
@@ -71,7 +78,7 @@ void *soapserver_monitor (void *data) {
 	continue;
       }
       else {
-	fprintf(stderr, "Server timed out\n");
+	syslog(LOG_NOTICE, "Server timed out\n");
 	break;
       }
     }
@@ -90,9 +97,9 @@ void soapserver_stop () {
     }
   for (i = 0; i < MAX_THR; i++)
     {
-      fprintf(stderr, "Waiting for thread %d to terminate... ", i);
+      syslog (LOG_NOTICE, "Waiting for thread %d to terminate... ", i);
       pthread_join(tid[i], NULL);
-      fprintf(stderr, "terminated\n");
+      syslog (LOG_NOTICE, "Thread %d terminated\n", i);
       soap_done(soap_thr[i]);
       free(soap_thr[i]);
     }
@@ -114,7 +121,9 @@ void *process_queue(void *soap)
       soap_serve(tsoap);
       soap_destroy(tsoap);
       soap_end(tsoap);
-      fprintf(stderr, "served\n");
+#if defined (DEBUG)
+      syslog (LOG_DEBUG, "served\n");
+#endif
     }
   return NULL;
 }
@@ -156,26 +165,30 @@ SOAP_SOCKET dequeue()
  * implementation of the soapfunction
  */
 int ns__planner(struct soap *soap, long from, long to, double dist, struct JumpRoute *route) {
-  route->__size=2;
-  route->__ptr = (struct Jump *)malloc(sizeof(struct Jump) * route->__size);
- 
-  struct Jump *jumps = route->__ptr;
-  jumps[0].system = 300096;
-  jumps[0].distance = 0;
-  jumps[1].system = 3000112;
-  jumps[1].distance = 11.2;
 
-  fprintf(stderr, "Something managed to call me with (%ld, %ld, %f)\n", from, to, dist);
-  int i;
-  for (i=0; i < route->__size ; i++) {
-    fprintf(stderr, "item %d : %ld %f\n", i, jumps[i].system, jumps[i].distance);
-  }
+  syslog (LOG_INFO, "Planner request with (%ld, %ld, %f)\n", from, to, dist);
 
   jumproute_t *waypoints;
   waypoints = calculator(from, to, dist);
 
   if (waypoints == NULL) {
     return soap_sender_fault(soap, "Route calculation failed" , "calculator module returned empty result");
+  }
+  
+  route->__ptr = (struct Jump *)malloc(sizeof(struct Jump) * waypoints->size);
+  route->__size=waypoints->size;
+ 
+  struct Jump *jumps = route->__ptr;
+
+  int i;
+  for (i=0; i < waypoints->size ; i++) {
+#if defined (DEBUG)
+    syslog (LOG_DEBUG, "item %d : %ld %f\n", i, 
+	    waypoints->jumps[i].solarsystemid, 
+	    waypoints->jumps[i].distance);
+#endif
+    jumps[i].system = waypoints->jumps[i].solarsystemid;
+    jumps[i].distance = waypoints->jumps[i].distance;
   }
 
   return SOAP_OK;
