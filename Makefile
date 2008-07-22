@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.9 2008/07/22 11:34:47 cvsd Exp $
+# $Id: Makefile,v 1.10 2008/07/22 11:38:59 cvsd Exp $
 #
 # Makefile
 
@@ -11,7 +11,7 @@ CPPFLAGS=-O3 -march=i686 -fomit-frame-pointer -pipe
 #CPPFLAGS= -g -DDEBUG -Wall
 LDFLAGS=-lpthread -lpq
 
-SOURCES=planner_ws.c main.c soapServer.c soapC.c dbaccess.c calculator.c prioqueue.c btree.c
+SOURCES=planner_ws.c main.c soapServer.c soapC.c dbaccess.c calculator.c prioqueue.c btree.c redblack.c
 OBJS=$(patsubst %.c,%.o,${SOURCES})
 
 SOAPCPP2=/usr/bin/soapcpp2
